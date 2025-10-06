@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IA Movie Maker - Crie vídeos musicais com IA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0a0a0a;
+            color: #e0e0e0;
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #1a0033 0%, #2d1b69 100%);
+        }
+        
+        .purple-glow {
+            box-shadow: 0 0 15px rgba(139, 92, 246, 0.5);
+        }
+        
+        .sidebar-item {
+            transition: all 0.3s ease;
+        }
+        
+        .sidebar-item:hover {
+            background-color: rgba(139, 92, 246, 0.2);
+            transform: translateX(5px);
+        }
+        
+        .sidebar-item.active {
+            background-color: rgba(139, 92, 246, 0.3);
+            border-left: 3px solid #8b5cf6;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(139, 92, 246, 0.3);
+        }
+        
+        .card {
+            background-color: #1a1a2e;
+            border: 1px solid #2d2d44;
+            transition: all 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .preview-container {
+            background-color: #0f0f1e;
+            border: 2px dashed #2d2d44;
+            border-radius: 8px;
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .timeline {
+            background-color: #1a1a2e;
+            border-radius: 8px;
+            height: 100px;
+            position: relative;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+        
+        .timeline-track {
+            height: 40px;
+            background-color: #0f0f1e;
+            border-radius: 4px;
+            margin: 5px 10px;
+            position: relative;
+        }
+        
+        .timeline-item {
+            position: absolute;
+            height: 30px;
+            background-color: #8b5cf6;
+            border-radius: 4px;
+            top: 5px;
+            cursor: move;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .loader {
+            border: 4px solid rgba(139, 92, 246, 0.1);
+            border-radius: 50%;
+            border-top: 4px solid #8b5cf6;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .sample-video {
+            position: relative;
+            overflow: hidden;
+            border-radius: 8px;
+        }
+        
+        .sample-video::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, #8b5cf6 0%, #7c3aed 50%, #8b5cf6 100%);
+            background-size: 400% 400%;
+            animation: gradient 15s ease infinite;
+            z-index: -1;
+        }
+        
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        .sample-video-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+        
+        .sample-video-overlay i {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+            
+            .sidebar.mobile-open {
+                transform: translateX(0);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100">
+    <!-- Header -->
+    <header class="gradient-bg py-4 px-6 flex justify-between items-center shadow-lg">
+        <div class="flex items-center">
+            <button id="menu-toggle" class="md:hidden mr-4 text-white">
+                <i class="fas fa-bars text-xl"></i>
+            </button>
+            <div class="flex items-center">
+                <i class="fas fa-video text-purple-400 text-2xl mr-3"></i>
+                <h1 class="text-2xl font-bold text-white">IA Movie Maker</h1>
+            </div>
+        </div>
+        <div class="flex items-center space-x-4">
+            <button class="text-white hover:text-purple-300 transition">
+                <i class="fas fa-bell text-xl"></i>
+            </button>
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center">
+                    <i class="fas fa-user text-white"></i>
+                </div>
+                <span class="hidden md:inline text-white">Usuário</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex flex-col md:flex-row">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="sidebar w-full md:w-64 bg-gray-800 min-h-screen py-6 px-4 md:px-0 md:py-8 fixed md:relative z-50">
+            <nav>
+                <ul class="space-y-2">
+                    <li>
+                        <a href="#" class="sidebar-item active flex items-center py-3 px-6 text-white rounded-lg" data-section="home">
+                            <i class="fas fa-home mr-3 text-purple-400"></i>
+                            <span>Início</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="sidebar-item flex items-center py-3 px-6 text-white rounded-lg" data-section="music">
+                            <i class="fas fa-music mr-3 text-purple-400"></i>
+                            <span>Música 🎵</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="sidebar-item flex items-center py-3 px-6 text-white rounded-lg" data-section="lyrics">
+                            <i class="fas fa-pen-fancy mr-3 text-purple-400"></i>
+                            <span>Letras ✍️</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="sidebar-item flex items-center py-3 px-6 text-white rounded-lg" data-section="video">
+                            <i class="fas fa-film mr-3 text-purple-400"></i>
+                            <span>Vídeo 🎥</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="sidebar-item flex items-center py-3 px-6 text-white rounded-lg" data-section="export">
+                            <i class="fas fa-download mr-3 text-purple-400"></i>
+                            <span>Exportação ⬇️</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            
+            <div class="mt-8 px-6">
+                <div class="card p-4 rounded-lg">
+                    <h3 class="text-white font-semibold mb-2">Plano Gratuito</h3>
+                    <p class="text-gray-400 text-sm mb-4">3 vídeos/mês<br>720p máximo</p>
+                    <button class="w-full py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                        Atualizar Plano
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 p-4 md:p-8">
+            <!-- Home Section -->
+            <section id="home-section" class="content-section">
+                <div class="mb-8 text-center">
+                    <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">Crie vídeos incríveis com música, letra e emoção – em segundos, com IA.</h2>
+                    <p class="text-gray-400 max-w-2xl mx-auto">Transforme suas músicas em vídeos musicais impressionantes com nossa plataforma de inteligência artificial.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+                    <div class="card p-6 rounded-lg">
+                        <h3 class="text-xl font-semibold text-white mb-4">Comece do zero</h3>
+                        <p class="text-gray-400 mb-6">Faça upload da sua música e deixe nossa IA criar um vídeo incrível para você.</p>
+                        <button id="create-new-btn" class="btn-primary w-full py-3 text-white rounded-lg font-medium">
+                            Criar Novo Vídeo
+                        </button>
+                    </div>
+                    
+                    <div class="card p-6 rounded-lg">
+                        <h3 class="text-xl font-semibold text-white mb-4">Experimente um exemplo</h3>
+                        <p class="text-gray-400 mb-6">Veja como nossa IA funciona com este vídeo de demonstração.</p>
+                        <button id="sample-demo-btn" class="btn-primary w-full py-3 text-white rounded-lg font-medium">
+                            Ver Demonstração
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card p-6 rounded-lg">
+                    <h3 class="text-xl font-semibold text-white mb-4">Como funciona</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                        <div class="text-center">
+                            <div class="w-16 h-16 bg-purple-900 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <span class="text-2xl font-bold text-white">1</span>
+                            </div>
+                            <h4 class="text-white font-medium mb-2">Envie sua música</h4>
+                            <p class="text-gray-400 text-sm">Faça upload de um arquivo de áudio ou insira um link do YouTube.</p>
+                        </div>
+                        <div class="text-center">
+                            <div class="w-16 h-16 bg-purple-900 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <span class="text-2xl font-bold text-white">2</span>
+                            </div>
+                            <h4 class="text-white font-medium mb-2">Personalize</h4>
+                            <p class="text-gray-400 text-sm">Adicione letras, escolha estilos visuais e personalize seu vídeo.</p>
+                        </div>
+                        <div class="text-center">
+                            <div class="w-16 h-16 bg-purple-900 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <span class="text-2xl font-bold text-white">3</span>
+                            </div>
+                            <h4 class="text-white font-medium mb-2">Exporte</h4>
+                            <p class="text-gray-400 text-sm">Baixe seu vídeo em alta qualidade e compartilhe com o mundo.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Music Section -->
+            <section id="music-section" class="content-section hidden">
+                <h2 class="text-2xl font-bold text-white mb-6">Adicionar Música</h2>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div>
+                        <div class="card p-6 rounded-lg mb-6">
+                            <h3 class="text-xl font-semibold text-white mb-4">Fonte da Música</h3>
+                            
+                            <div class="mb-6">
+                                <label class="block text-gray-400 mb-2">Selecione uma opção:</label>
+                                <div class="space-y-3">
+                                    <div class="flex items-center">
+                                        <input type="radio" id="upload-file" name="music-source" class="mr-2" checked>
+                                        <label for="upload-file" class="text-white">Fazer upload de arquivo</label>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <input type="radio" id="youtube-link" name="music-source" class="mr-2">
+                                        <label for="youtube-link" class="text-white">Link do YouTube</label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div id="upload-area" class="mb-6">
+                                <label class="block text-gray-400 mb-2">Formatos suportados: MP3, WAV</label>
+                                <div class="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center cursor-pointer hover:border-purple-500 transition">
+                                    <i class="fas fa-cloud-upload-alt text-4xl text-purple-500 mb-3"></i>
+                                    <p class="text-white mb-2">Arraste e solte seu arquivo aqui</p>
+                                    <p class="text-gray-400 text-sm">ou</p>
+                                    <button class="mt-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                                        Selecionar Arquivo
+                                    </button>
+                                    <input type="file" class="hidden" accept=".mp3,.wav">
+                                </div>
+                            </div>
+                            
+                            <div id="youtube-area" class="mb-6 hidden">
+                                <label class="block text-gray-400 mb-2">Insira o link do YouTube:</label>
+                                <input type="text" placeholder="https://www.youtube.com/watch?v=..." class="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                <button class="mt-3 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                                    Carregar Música
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="card p-6 rounded-lg">
+                            <h3 class="text-xl font-semibold text-white mb-4">Análise da Música</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <div class="flex justify-between mb-1">
+                                        <span class="text-gray-400">Ritmo</span>
+                                        <span class="text-white">Alto</span>
+                                    </div>
+                                    <div class="w-full bg-gray-700 rounded-full h-2.5">
+                                        <div class="bg-purple-600 h-2.5 rounded-full" style="width: 85%"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between mb-1">
+                                        <span class="text-gray-400">Energia</span>
+                                        <span class="text-white">Média</span>
+                                    </div>
+                                    <div class="w-full bg-gray-700 rounded-full h-2.5">
+                                        <div class="bg-purple-600 h-2.5 rounded-full" style="width: 65%"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between mb-1">
+                                        <span class="text-gray-400">Duração</span>
+                                        <span class="text-white">3:45</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <div class="card p-6 rounded-lg">
+                            <h3 class="text-xl font-semibold text-white mb-4">Player de Música</h3>
+                            <div class="preview-container mb-4">
+                                <div class="text-center">
+                                    <i class="fas fa-music text-6xl text-purple-500 mb-4"></i>
+                                    <p class="text-gray-400">Nenhuma música carregada</p>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center justify-between mb-4">
+                                <span class="text-gray-400 text-sm">0:00</span>
+                                <div class="flex-1 mx-4 h-1 bg-gray-700 rounded-full">
+                                    <div class="h-1 bg-purple-600 rounded-full" style="width: 0%"></div>
+                                </div>
+                                <span class="text-gray-400 text-sm">0:00</span>
+                            </div>
+                            
+                            <div class="flex justify-center space-x-6">
+                                <button class="text-gray-400 hover:text-white">
+                                    <i class="fas fa-step-backward text-xl"></i>
+                                </button>
+                                <button class="w-12 h-12 rounded-full bg-purple-600 flex items-center justify-center hover:bg-purple-700 transition">
+                                    <i class="fas fa-play text-white"></i>
+                                </button>
+                                <button class="text-gray-400 hover:text-white">
+                                    <i class="fas fa-step-forward text-xl"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="card p-6 rounded-lg mt-6">
+                            <h3 class="text-xl font-semibold text-white mb-4">Estilo Sugerido pela IA</h3>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="bg-gray-700 rounded-lg p-4 text-center cursor-pointer hover:bg-gray-600 transition">
+                                    <i class="fas fa-bolt text-yellow-500 text-2xl mb-2"></i>
+                                    <p class="text-white">Energético</p>
+                                </div>
+                                <div class="bg-gray-700 rounded-lg p-4 text-center cursor-pointer hover:bg-gray-600 transition">
+                                    <i class="fas fa-fire text-red-500 text-2xl mb-2"></i>
+                                    <p class="text-white">Dinâmico</p>
+                                </div>
+                                <div class="bg-gray-700 rounded-lg p-4 text-center cursor-pointer hover:bg-gray-600 transition">
+                                    <i class="fas fa-water text-blue-500 text-2xl mb-2"></i>
+                                    <p class="text-white">Fluido</p>
+                                </div>
+                                <div class="bg-gray-700 rounded-lg p-4 text-center cursor-pointer hover:bg-gray-600 transition">
+                                    <i class="fas fa-star text-purple-500 text-2xl mb-2"></i>
+                                    <p class="text-white">Elegante</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Lyrics Section -->
+            <section id="lyrics-section" class="content-section hidden">
+                <h2 class="text-2xl font-bold text-white mb-6">Letras da Música</h2>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div>
+                        <div class="card p-6 rounded-lg mb-6">
+                            <h3 class="text-xl font-semibold text-white mb-4">Adicionar Letras</h3>
+                            
+                            <div class="mb-6">
+                                <label class="block text-gray-400 mb-2">Selecione uma opção:</label>
+                                <div class="space-y-3">
+                                    <div class="flex items-center">
+                                        <input type="radio" id="type-lyrics" name="lyrics-source" class="mr-2" checked>
+                                        <label for="type-lyrics" class="text-white">Digitar letras</label>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <input type="radio" id="generate-lyrics" name="lyrics-source" class="mr-2">
+                                        <label for="generate-lyrics" class="text-white">Gerar letras com IA</label>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <input type="radio" id="upload-lyrics" name="lyrics-source" class="mr-2">
+                                        <label for="upload-lyrics" class="text-white">Importar arquivo de letras</label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div id="type-lyrics-area" class="mb-6">
+                                <label class="block text-gray-400 mb-2">Digite as letras da música:</label>
+                                <textarea class="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 h-64" placeholder="Digite as letras da música aqui..."></textarea>
+                                <button class="mt-3 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                                    Salvar Letras
+                                </button>
+                            </div>
+                            
+                            <div id="generate-lyrics-area" class="mb-6 hidden">
+                                <label class="block text-gray-400 mb-2">Tema da música:</label>
+                                <input type="text" placeholder="Ex: amor, superação, festa..." class="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 mb-4">
+                                <label class="block text-gray-400 mb-2">Estilo:</label>
+                                <select class="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 mb-4">
+                                    <option>Pop</option>
+                                    <option>Rock</option>
+                                    <option>Hip Hop</option>
+                                    <option>Eletrônica</option>
+                                    <option>Gospel</option>
+                                    <option>Sertanejo</option>
+                                    <option>Funk</option>
+                                    <option>Outro</option>
+                                </select>
+                                <button class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                                    Gerar Letras com IA
+                                </button>
+                            </div>
+                            
+                            <div id="upload-lyrics-area" class="mb-6 hidden">
+                                <label class="block text-gray-400 mb-2">Formatos suportados: TXT, LRC</label>
+                                <div class="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center cursor-pointer hover:border-purple-500 transition">
+                                    <i class="fas fa-file-upload text-4xl text-purple-500 mb-3"></i>
+                                    <p class="text-white mb-2">Arraste e solte seu arquivo aqui</p>
+                                    <p class="text-gray-400 text-sm">ou</p>
+                                    <button class="mt-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                                        Selecionar Arquivo
+                                    </button>
+                                    <input type="file" class="hidden" accept=".txt,.lrc">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <div class="card p-6 rounded-lg">
+                            <h3 class="text-xl font-semibold text-white mb-4">Preview das Letras</h3>
+                            <div class="preview-container h-96">
+                                <div class="text-center">
+                                    <div class="space-y-4">
+                                        <p class="text-gray-400 text-sm">[00:12.50]</p>
+                                        <p class="text-2xl font-bold text-white">Esta é uma linha de exemplo</p>
+                                        <p class="text-gray-400 text-sm">[00:15.75]</p>
+                                        <p class="text-xl text-gray-300">Outra linha da música</p>
+                                        <p class="text-gray-400 text-sm">[00:19.20]</p>
+                                        <p class="text-lg text-gray-400">Mais uma linha aqui</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-6">
+                                <h4 class="text-white font-medium mb-3">Personalizar Estilo das Letras</h4>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-gray-400 mb-2">Fonte:</label>
+                                        <select class="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                            <option>Inter</option>
+                                            <option>Roboto</option>
+                                            <option>Montserrat</option>
+                                            <option>Open Sans</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-gray-400 mb-2">Tamanho:</label>
+                                        <input type="range" min="16" max="48" value="24" class="w-full">
+                                    </div>
+                                    <div>
+                                        <label class="block text-gray-400 mb-2">Cor:</label>
+                                        <div class="flex space-x-2">
+                                            <div class="w-8 h-8 rounded-full bg-white border-2 border-purple-600 cursor-pointer"></div>
+                                            <div class="w-8 h-8 rounded-full bg-purple-500 cursor-pointer"></div>
+                                            <div class="w-8 h-8 rounded-full bg-blue-500 cursor-pointer"></div>
+                                            <div class="w-8 h-8 rounded-full bg-red-500 cursor-pointer"></div>
+                                            <div class="w-8 h-8 rounded-full bg-yellow-500 cursor-pointer"></div>
+                                            <div class="w-8 h-8 rounded-full bg-green-500 cursor-pointer"></div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="block text-gray-400 mb-2">Efeito:</label>
+                                        <select class="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                            <option>Nenhum</option>
+                                            <option>Sombra</option>
+                                            <option>Neon</option>
+                                            <option>Contorno</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Video Section -->
+            <section id="video-section" class="content-section hidden">
+                <h2 class="text-2xl font-bold text-white mb-6">Editor de Vídeo</h2>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2">
+                        <div class="card p-6 rounded-lg mb-6">
+                            <h3 class="text-xl font-semibold text-white mb-4">Preview do Vídeo</h3>
+                            <div class="preview-container h-96">
+                                <div class="text-center">
+                                    <div class="sample-video w-full h-full flex items-center justify-center">
+                                        <div class="sample-video-overlay">
+                                            <i class="fas fa-play-circle text-6xl text-white mb-4"></i>
+                                            <p class="text-xl font-bold">Preview do Vídeo</p>
+                                            <p class="text-sm mt-2">Clique para reproduzir</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="flex justify-between mt-4">
+                                <button class="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition">
+                                    <i class="fas fa-play mr-2"></i> Reproduzir
+                                </button>
+                                <div class="flex space-x-2">
+                                    <button class="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition">
+                                        <i class="fas fa-undo mr-2"></i> Desfazer
+                                    </button>
+                                    <button class="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition">
+                                        <i class="fas fa-redo mr-2"></i> Refazer
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card p-6 rounded-lg">
+                            <h3 class="text-xl font-semibold text-white mb-4">Linha do Tempo</h3>
+                            <div class="timeline">
+                                <div class="timeline-track">
+                                    <div class="timeline-item" style="left: 10px; width: 120px;">
+                                        <div class="h-full flex items-center px-2 text-xs text-white">Música</div>
+                                    </div>
+                                </div>
+                                <div class="timeline-track">
+                                    <div class="timeline-item" style="left: 10px; width: 120px;">
+                                        <div class="h-full flex items-center px-2 text-xs text-white">Letras</div>
+                                    </div>
+                                </div>
+                                <div class="timeline-track">
+                                    <div class="timeline-item" style="left: 30px; width: 80px;">
+                                        <div class="h-full flex items-center px-2 text-xs text-white">Efeito 1</div>
+                                    </div>
+                                    <div class="timeline-item" style="left: 150px; width: 100px;">
+                                        <div class="h-full flex items-center px-2 text-xs text-white">Efeito 2</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <div class="card p-6 rounded-lg mb-6">
+                            <h3 class="text-xl font-semibold text-white mb-4">Ferramentas de Edição</h3>
+                            
+                            <div class="space-y-4">
+                                <div>
+                                    <h4 class="text-white font-medium mb-2">Adicionar Elementos</h4>
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <button class="py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition">
+                                            <i class="fas fa-image mr-1"></i> Imagem
+                                        </button>
+                                        <button class="py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition">
+                                            <i class="fas fa-video mr-1"></i> Vídeo
+                                        </button>
+                                        <button class="py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition">
+                                            <i class="fas fa-font mr-1"></i> Texto
+                                        </button>
+                                        <button class="py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition">
+                                            <i class="fas fa-shapes mr-1"></i> Forma
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="text-white font-medium mb-2">Efeitos</h4>
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <button class="py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition">
+                                            <i class="fas fa-magic mr-1"></i> Transição
+                                        </button>
+                                        <button class="py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition">
+                                            <i class="fas fa-filter mr-1"></i> Filtro
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="text-white font-medium mb-2">Marca d'água</h4>
+                                    <div class="flex items-center justify-between mb-3">
+                                        <span class="text-gray-400">Adicionar marca d'água</span>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" class="sr-only peer">
+                                            <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                                        </label>
+                                    </div>
+                                    <button class="w-full py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition">
+                                        <i class="fas fa-upload mr-2"></i> Fazer Upload
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card p-6 rounded-lg">
+                            <h3 class="text-xl font-semibold text-white mb-4">Estilos Visuais</h3>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="bg-gray-700 rounded-lg p-3 text-center cursor-pointer hover:bg-gray-600 transition">
+                                    <div class="w-full h-16 bg-gradient-to-r from-purple-900 to-purple-600 rounded mb-2"></div>
+                                    <p class="text-white text-sm">Ritmo Rápido</p>
+                                </div>
+                                <div class="bg-gray-700 rounded-lg p-3 text-center cursor-pointer hover:bg-gray-600 transition">
+                                    <div class="w-full h-16 bg-gradient-to-r from-blue-900 to-blue-600 rounded mb-2"></div>
+                                    <p class="text-white text-sm">Calmo</p>
+                                </div>
+                                <div class="bg-gray-700 rounded-lg p-3 text-center cursor-pointer hover:bg-gray-600 transition">
+                                    <div class="w-full h-16 bg-gradient-to-r from-red-900 to-red-600 rounded mb-2"></div>
+                                    <p class="text-white text-sm">Energético</p>
+                                </div>
+                                <div class="bg-gray-700 rounded-lg p-3 text-center cursor-pointer hover:bg-gray-600 transition">
+                                    <div class="w-full h-16 bg-gradient-to-r from-green-900 to-green-600 rounded mb-2"></div>
+                                    <p class="text-white text-sm">Natural</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Export Section -->
+            <section id="export-section" class="content-section hidden">
+                <h2 class="text-2xl font-bold text-white mb-6">Exportar Vídeo</h2>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div>
+                        <div class="card p-6 rounded-lg mb-6">
+                            <h3 class="text-xl font-semibold text-white mb-4">Configurações de Exportação</h3>
+                            
+                            <div class="space-y-6">
+                                <div>
+                                    <label class="block text-gray-400 mb-2">Qualidade do Vídeo</label>
+                                    <div class="grid grid-cols-3 gap-3">
+                                        <div class="border border-gray-600 rounded-lg p-4 text-center cursor-pointer hover:border-purple-500 transition">
+                                            <i class="fas fa-video text-gray-400 mb-2"></i>
+                                            <p class="text-white font-medium">720p</p>
+                                            <p class="text-gray-400 text-sm">HD</p>
+                                        </div>
+                                        <div class="border border-purple-500 rounded-lg p-4 text-center cursor-pointer bg-purple-900 bg-opacity-20">
+                                            <i class="fas fa-video text-purple-500 mb-2"></i>
+                                            <p class="text-white font-medium">1080p</p>
+                                            <p class="text-gray-400 text-sm">Full HD</p>
+                                        </div>
+                                        <div class="border border-gray-600 rounded-lg p-4 text-center cursor-pointer hover:border-purple-500 transition">
+                                            <i class="fas fa-video text-gray-400 mb-2"></i>
+                                            <p class="text-white font-medium">4K</p>
+                                            <p class="text-gray-400 text-sm">Ultra HD</p>
+                                            <p class="text-xs text-yellow-500 mt-1">Premium</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-gray-400 mb-2">Formato do Arquivo</label>
+                                    <select class="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                        <option>MP4 (Recomendado)</option>
+                                        <option>MOV</option>
+                                        <option>AVI</option>
+                                        <option>WebM</option>
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-gray-400 mb-2">Nome do Arquivo</label>
+                                    <input type="text" value="meu_video_musical" class="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                </div>
+                                
+                                <div>
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="text-gray-400">Incluir marca d'água</span>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" class="sr-only peer">
+                                            <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <div class="card p-6 rounded-lg mb-6">
+                            <h3 class="text-xl font-semibold text-white mb-4">Preview Final</h3>
+                            <div class="preview-container h-64">
+                                <div class="text-center">
+                                    <div class="sample-video w-full h-full flex items-center justify-center">
+                                        <div class="sample-video-overlay">
+                                            <i class="fas fa-play-circle text-4xl text-white mb-3"></i>
+                                            <p class="text-lg font-bold">Preview Final</p>
+                                            <p class="text-sm mt-1">1080p • 3:45</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-4 grid grid-cols-2 gap-3">
+                                <div class="bg-gray-700 rounded-lg p-3">
+                                    <p class="text-gray-400 text-sm">Duração</p>
+                                    <p class="text-white font-medium">3:45</p>
+                                </div>
+                                <div class="bg-gray-700 rounded-lg p-3">
+                                    <p class="text-gray-400 text-sm">Tamanho estimado</p>
+                                    <p class="text-white font-medium">~85 MB</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card p-6 rounded-lg">
+                            <h3 class="text-xl font-semibold text-white mb-4">Exportar</h3>
+                            
+                            <div class="space-y-4">
+                                <button id="export-video-btn" class="btn-primary w-full py-3 text-white rounded-lg font-medium">
+                                    <i class="fas fa-download mr-2"></i> Baixar Vídeo
+                                </button>
+                                
+                                <div class="flex space-x-3">
+                                    <button class="flex-1 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition">
+                                        <i class="fab fa-youtube mr-2"></i> YouTube
+                                    </button>
+                                    <button class="flex-1 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition">
+                                        <i class="fab fa-instagram mr-2"></i> Instagram
+                                    </button>
+                                    <button class="flex-1 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition">
+                                        <i class="fab fa-tiktok mr-2"></i> TikTok
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal -->
+    <div id="modal" class="modal">
+        <div class="bg-gray-800 rounded-lg p-8 max-w-md w-full mx-4">
+            <div class="text-center">
+                <div class="loader mx-auto mb-6"></div>
+                <h3 class="text-xl font-semibold text-white mb-2">Processando seu vídeo</h3>
+                <p class="text-gray-400">Isso pode levar alguns minutos...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Menu toggle for mobile
+        const menuToggle = document.getElementById('menu-toggle');
+        const sidebar = document.getElementById('sidebar');
+        
+        menuToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('mobile-open');
+        });
+
+        // Sidebar navigation
+        const sidebarItems = document.querySelectorAll('.sidebar-item');
+        const contentSections = document.querySelectorAll('.content-section');
+        
+        sidebarItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                
+                // Remove active class from all items
+                sidebarItems.forEach(i => i.classList.remove('active'));
+                
+                // Add active class to clicked item
+                item.classList.add('active');
+                
+                // Hide all content sections
+                contentSections.forEach(section => section.classList.add('hidden'));
+                
+                // Show selected section
+                const sectionId = item.getAttribute('data-section') + '-section';
+                document.getElementById(sectionId).classList.remove('hidden');
+                
+                // Close sidebar on mobile after selection
+                if (window.innerWidth < 768) {
+                    sidebar.classList.remove('mobile-open');
+                }
+            });
+        });
+
+        // Music source selection
+        const musicSourceRadios = document.querySelectorAll('input[name="music-source"]');
+        const uploadArea = document.getElementById('upload-area');
+        const youtubeArea = document.getElementById('youtube-area');
+        
+        musicSourceRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                if (radio.id === 'upload-file') {
+                    uploadArea.classList.remove('hidden');
+                    youtubeArea.classList.add('hidden');
+                } else if (radio.id === 'youtube-link') {
+                    uploadArea.classList.add('hidden');
+                    youtubeArea.classList.remove('hidden');
+                }
+            });
+        });
+
+        // Lyrics source selection
+        const lyricsSourceRadios = document.querySelectorAll('input[name="lyrics-source"]');
+        const typeLyricsArea = document.getElementById('type-lyrics-area');
+        const generateLyricsArea = document.getElementById('generate-lyrics-area');
+        const uploadLyricsArea = document.getElementById('upload-lyrics-area');
+        
+        lyricsSourceRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                if (radio.id === 'type-lyrics') {
+                    typeLyricsArea.classList.remove('hidden');
+                    generateLyricsArea.classList.add('hidden');
+                    uploadLyricsArea.classList.add('hidden');
+                } else if (radio.id === 'generate-lyrics') {
+                    typeLyricsArea.classList.add('hidden');
+                    generateLyricsArea.classList.remove('hidden');
+                    uploadLyricsArea.classList.add('hidden');
+                } else if (radio.id === 'upload-lyrics') {
+                    typeLyricsArea.classList.add('hidden');
+                    generateLyricsArea.classList.add('hidden');
+                    uploadLyricsArea.classList.remove('hidden');
+                }
+            });
+        });
+
+        // Create new video button
+        const createNewBtn = document.getElementById('create-new-btn');
+        createNewBtn.addEventListener('click', () => {
+            // Navigate to music section
+            sidebarItems.forEach(i => i.classList.remove('active'));
+            document.querySelector('[data-section="music"]').classList.add('active');
+            
+            contentSections.forEach(section => section.classList.add('hidden'));
+            document.getElementById('music-section').classList.remove('hidden');
+            
+            // Close sidebar on mobile after selection
+            if (window.innerWidth < 768) {
+                sidebar.classList.remove('mobile-open');
+            }
+        });
+
+        // Sample demo button
+        const sampleDemoBtn = document.getElementById('sample-demo-btn');
+        sampleDemoBtn.addEventListener('click', () => {
+            // Navigate to video section
+            sidebarItems.forEach(i => i.classList.remove('active'));
+            document.querySelector('[data-section="video"]').classList.add('active');
+            
+            contentSections.forEach(section => section.classList.add('hidden'));
+            document.getElementById('video-section').classList.remove('hidden');
+            
+            // Close sidebar on mobile after selection
+            if (window.innerWidth < 768) {
+                sidebar.classList.remove('mobile-open');
+            }
+        });
+
+        // Export video button
+        const exportVideoBtn = document.getElementById('export-video-btn');
+        const modal = document.getElementById('modal');
+        
+        exportVideoBtn.addEventListener('click', () => {
+            modal.classList.add('active');
+            
+            // Simulate processing time
+            setTimeout(() => {
+                modal.classList.remove('active');
+                
+                // Show success message
+                const successMessage = document.createElement('div');
+                successMessage.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+                successMessage.innerHTML = '<i class="fas fa-check-circle mr-2"></i> Vídeo exportado com sucesso!';
+                document.body.appendChild(successMessage);
+                
+                // Remove success message after 3 seconds
+                setTimeout(() => {
+                    successMessage.remove();
+                }, 3000);
+            }, 3000);
+        });
+
+        // Close modal when clicking outside
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.remove('active');
+            }
+        });
+
+        // File upload simulation
+        const fileInputs = document.querySelectorAll('input[type="file"]');
+        fileInputs.forEach(input => {
+            input.addEventListener('change', (e) => {
+                const fileName = e.target.files[0]?.name || 'Nenhum arquivo selecionado';
+                const label = e.target.parentElement;
+                const p = label.querySelector('p');
+                if (p) {
+                    p.textContent = fileName;
+                }
+            });
+        });
+    </script>
+</body>
+</html>
